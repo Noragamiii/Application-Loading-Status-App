@@ -31,8 +31,8 @@
 
         <ImageView
             android:id="@+id/image"
-            android:layout_width="0dp"
-            android:layout_height="200dp"
+            android:layout_width="match_parent"
+            android:layout_height="300dp"
             android:contentDescription="@string/Image"
             app:layout_constraintEnd_toEndOf="@id/end"
             app:layout_constraintStart_toStartOf="@id/start"
@@ -42,8 +42,8 @@
 
         <RadioGroup
             android:id="@+id/download_option_radio_group"
-            android:layout_width="0dp"
-            android:layout_height="0dp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
             android:gravity="center_vertical"
             app:layout_constraintBottom_toTopOf="@+id/custom_button"
             app:layout_constraintEnd_toEndOf="@id/end"
@@ -56,6 +56,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="@string/Glide"
+                android:textSize= "20sp"
                 />
 
             <RadioButton
@@ -64,6 +65,7 @@
                 android:layout_height="wrap_content"
                 android:text="@string/LoadApp"
                 android:textAppearance="@style/TextAppearance.AppCompat.Headline"
+                android:textSize= "20sp"
                 />
 
             <RadioButton
@@ -72,6 +74,7 @@
                 android:layout_height="wrap_content"
                 android:text="@string/Retrofit"
                 android:textAppearance="@style/TextAppearance.AppCompat.Headline"
+                android:textSize= "20sp"
                 />
         </RadioGroup>
 
@@ -79,16 +82,15 @@
             android:id="@+id/custom_button"
             android:layout_width="0dp"
             android:layout_height="60dp"
-            android:layout_marginBottom="20dp"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="@id/end"
             app:layout_constraintStart_toStartOf="@id/start"
-            app:loadingDefaultBackgroundColor="?attr/colorPrimary"
-            app:loadingBackgroundColor="?attr/colorPrimaryDark"
-            app:loadingDefaultText="Download"
-            app:loadingText="We are loading"
-            app:loadingTextColor="@color/white"
+            android:layout_marginBottom="20dp"
+            app:loadingButtonColor="@color/colorPrimaryDark"
+            app:loadingCircleColor="@color/colorAccent"
+            app:initButtonColor="@color/colorPrimary"
+            app:textButton="@string/download"
+            app:textButtonDownload="@string/loading"
             />
-
     </androidx.constraintlayout.widget.ConstraintLayout>
 </layout>

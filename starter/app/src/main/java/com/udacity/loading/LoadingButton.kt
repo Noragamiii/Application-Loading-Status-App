@@ -4,11 +4,9 @@ import android.animation.AnimatorSet
 import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.*
-import android.text.TextPaint
 import android.util.AttributeSet
 import android.view.View
 import android.view.animation.LinearInterpolator
-import androidx.core.content.ContextCompat
 import androidx.core.content.withStyledAttributes
 import com.udacity.R
 import kotlin.math.min
@@ -19,225 +17,151 @@ class LoadingButton @JvmOverloads constructor(
 ) : View(context, attrs, defStyleAttr) {
     private var widthSize = 0
     private var heightSize = 0
-    private var loadingText: CharSequence = ""
-    private var loadingDefaultText: CharSequence = ""
-    private var loadingDefaultBackgroundColor = 0
-    private var loadingBackgroundColor = 0
-    private var progressCircleBackgroundColor = 0
-    private var loadingTextColor = 0
 
-    private val valueAnimator = ValueAnimator()
-    private val animatorSet =  AnimatorSet().apply {
-        duration = 3000
-    }
-
-    // Color Button
-    private var paintButton = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.FILL
-    }
-
-    // Button Text Type
+    private lateinit var buttonBounds: Rect
     private lateinit var buttonText: String
-    private val paintButtonText = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+    private val boundingCircle = RectF()
+    private var progressCircleValue = 0f
+    private var buttonValue = 0f
+
+    private var isInitialized = false
+
+    private var valueAnimator = AnimatorSet()
+    private lateinit var animationCircle: ValueAnimator
+    private lateinit var animationButton: ValueAnimator
+
+    private var loadingButtonColor = 0
+    private var loadingCircleColor = 0
+    private var initButtonColor    = 0
+
+    private val paintText = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.FILL
         textAlign = Paint.Align.CENTER
         textSize = resources.getDimension(R.dimen.default_text_size)
-        typeface = Typeface.DEFAULT
     }
 
-    // Bounding Text Button
-    private lateinit var buttonTextBounds: Rect
-
-    // Bounding Circle
-    private var progressCircle = RectF()
-    private var progressCircleSize = 0f
-
-    // Animation Circle (Create Circle 360)
-    private var progressCircleAnimation = 0f
-    private val animationCircle = ValueAnimator.ofFloat(0f, 360f).apply {
-        repeatMode = ValueAnimator.RESTART
-        repeatCount = ValueAnimator.INFINITE
-        interpolator = LinearInterpolator()
-        // when ValueAnimator change
-        addUpdateListener {
-            progressCircleAnimation = it.animatedValue as Float
-            invalidate()
-        }
+    private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
     }
-
-    // Background change
-    private var currentButtonBackgroundAnimationValue = 0f
-    private lateinit var buttonBackgroundAnimator: ValueAnimator
-
-    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
-        super.onSizeChanged(w, h, oldw, oldh)
-        progressCircleSize = (min(w, h) / 2f) * 0.3f
-        createButtonBackgroundAnimator()
-    }
-    private fun createButtonBackgroundAnimator() {
-        ValueAnimator.ofFloat(0f, widthSize.toFloat()).apply {
-            repeatMode = ValueAnimator.RESTART
-            repeatCount = ValueAnimator.INFINITE
-            interpolator = LinearInterpolator()
-            addUpdateListener {
-                currentButtonBackgroundAnimationValue = it.animatedValue as Float
-                invalidate()
-            }
-        }.also {
-            buttonBackgroundAnimator = it
-            animatorSet.playProgressCircleAndButtonBackgroundTogether()
-        }
-    }
-
-    private fun AnimatorSet.playProgressCircleAndButtonBackgroundTogether() =
-        apply { playTogether(animationCircle, buttonBackgroundAnimator) }
 
     private var buttonState: ButtonState by Delegates.observable<ButtonState>(ButtonState.Completed) { _, _, new ->
         when(new) {
+            ButtonState.Clicked -> {
+                buttonText = "Download"
+                if (buttonState == ButtonState.Completed) {
+                    buttonState = ButtonState.Clicked
+                    invalidate()
+                }
+            }
             // when state Loading
             ButtonState.Loading -> {
-                // set Text button
-                buttonText = loadingText.toString()
-
-                // Compute Bonding Text and Circle
-                if (!::buttonTextBounds.isInitialized) {
-                    computeButtonTextBounds()
-                    computeProgressCircleRect()
+                buttonText = "Loading ..."
+                // Bound init once times
+                if (!isInitialized) {
+                    buttonBounds = Rect()
+                    paintText.getTextBounds(buttonText, 0, buttonText.length, buttonBounds)
+                    val textWidth = buttonBounds.width()
+                    val textHeight = buttonBounds.height()
+                    val circleSize = min(textWidth, textHeight) + 16f
+                    val circleCenterX = textWidth + circleSize / 2f + 450f
+                    val circleCenterY = heightSize / 2f
+                    boundingCircle.set(
+                        circleCenterX - circleSize / 2f,
+                        circleCenterY - circleSize / 2f,
+                        circleCenterX + circleSize / 2f,
+                        circleCenterY + circleSize / 2f
+                    )
+                    isInitialized = true
                 }
 
-                animatorSet.start()
+                // create Animation
+                setupCircleAnimation()
+                setupButtonAnimation()
+                valueAnimator.playTogether(animationCircle, animationButton)
+                valueAnimator.start()
             }
-            else -> {
+            ButtonState.Completed -> {
                 // set Text button
-                buttonText = loadingDefaultText.toString()
-                new.takeIf { it == ButtonState.Completed }?.run {animatorSet.cancel()}
+                buttonText = "Download"
+                valueAnimator.cancel()
+                buttonValue = 0f
+                invalidate()
             }
         }
     }
 
-
-    override fun performClick(): Boolean {
-        super.performClick()
-        // We only change button state to Clicked if the current state is Completed
-        if (buttonState == ButtonState.Completed) {
-            buttonState = ButtonState.Clicked
-            invalidate()
+    private fun setupCircleAnimation() {
+        animationCircle = ValueAnimator.ofFloat(0f, 360f).apply {
+                duration = 1000
+                interpolator = LinearInterpolator()
+                repeatCount = 6
+                addUpdateListener { animator ->
+                progressCircleValue = animator.animatedValue as Float
+                invalidate()
+            }
         }
-        return true
-    }
-    private fun computeProgressCircleRect() {
-        val horizontalCenter =
-            (buttonTextBounds.right + buttonTextBounds.width() + 66f)
-        val verticalCenter = (heightSize / 2f)
-
-        progressCircle.set(
-            horizontalCenter - progressCircleSize,
-            verticalCenter - progressCircleSize,
-            horizontalCenter + progressCircleSize,
-            verticalCenter + progressCircleSize
-        )
     }
 
-    private fun computeButtonTextBounds() {
-        buttonTextBounds = Rect()
-        paintButtonText.getTextBounds(buttonText, 0, buttonText.length, buttonTextBounds)
+    private fun setupButtonAnimation() {
+        animationButton = ValueAnimator.ofFloat(0f, widthSize.toFloat()).apply {
+            duration = 1000
+            interpolator = LinearInterpolator()
+            repeatCount = 6
+            addUpdateListener { animator ->
+                buttonValue = animator.animatedValue as Float
+                invalidate()
+            }
+        }
     }
 
     init {
         isClickable = true
+        buttonText = "Download"
         context.withStyledAttributes(attrs, R.styleable.LoadingButton) {
-            loadingDefaultBackgroundColor =
-                getColor(R.styleable.LoadingButton_loadingDefaultBackgroundColor, 0)
-            loadingBackgroundColor =
-                getColor(R.styleable.LoadingButton_loadingBackgroundColor, 0)
-            loadingDefaultText =
-                getText(R.styleable.LoadingButton_loadingDefaultText)
-            loadingTextColor =
-                getColor(R.styleable.LoadingButton_loadingTextColor, 0)
-            loadingText =
-                getText(R.styleable.LoadingButton_loadingText)
-        }.also {
-            buttonText = loadingDefaultText.toString()
-            progressCircleBackgroundColor = ContextCompat.getColor(context, R.color.colorAccent)
-        }
+           loadingButtonColor = getColor(R.styleable.LoadingButton_loadingButtonColor, 0)
+           loadingCircleColor = getColor(R.styleable.LoadingButton_loadingCircleColor, 0)
+           initButtonColor    = getColor(R.styleable.LoadingButton_initButtonColor, 0)
+       }
     }
 
     override fun onDraw(canvas: Canvas?) {
         super.onDraw(canvas)
-        canvas?.let { drawButton ->
-            drawButton.apply {
-                drawBackgroundColorButton()
-                drawButtonText()
-                drawProgressCircleIfLoading()
-            }
-        }
+        drawBackgroundButton(canvas)
+        drawText(canvas)
+        drawCircleInProgress(canvas)
     }
 
-    private fun Canvas.drawProgressCircleIfLoading() {
+    private fun drawCircleInProgress(canvas: Canvas?) {
         if (buttonState == ButtonState.Loading) {
-            drawProgressCircle(this)
+            paint.color = loadingCircleColor
+            canvas?.drawArc(boundingCircle, 0f, progressCircleValue, true, paint)
         }
     }
 
-    private fun drawProgressCircle(canvas: Canvas?) {
-        paintButton.color = progressCircleBackgroundColor
-        canvas?.drawArc(
-            progressCircle,
-            0f,
-            progressCircleAnimation,
-            true,
-            paintButton
-        )
-    }
-
-    private fun Canvas.drawButtonText() {
-        paintButtonText.color = loadingTextColor
-        drawText(
+    private fun drawText(canvas: Canvas?) {
+        paintText.color = Color.WHITE
+        canvas?.drawText(
             buttonText,
-            (widthSize/2f),
-            (heightSize/2f) + paintButtonText.computeTextOffset(),
-            paintButtonText
+            widthSize / 2f,
+            heightSize / 2f + ( paintText.descent() - paintText.ascent())/2 - paintText.descent(),
+            paintText
         )
     }
 
-    private fun TextPaint.computeTextOffset() = ((descent() - ascent()) / 2) - descent()
-
-    private fun Canvas.drawBackgroundColorButton() {
-        when(buttonState) {
+    private fun drawBackgroundButton(canvas: Canvas?) {
+        when (buttonState) {
             ButtonState.Loading -> {
-                drawLoadingBackgroundColor()
-                drawDefaultBackgroundColor()
+                paint.color = loadingButtonColor
+                canvas?.drawRect(0f, 0f, buttonValue, heightSize.toFloat(), paint)
             }
             else -> {
-                drawColor(loadingDefaultBackgroundColor)
+                paint.color = initButtonColor
+                canvas?.drawRect(buttonValue, 0f, widthSize.toFloat(), heightSize.toFloat(), paint)
             }
         }
     }
 
-    private fun Canvas.drawLoadingBackgroundColor() = paintButton.apply {
-        color = loadingBackgroundColor
-    }.run {
-        drawRect(
-            0f,
-            0f,
-            currentButtonBackgroundAnimationValue,
-            heightSize.toFloat(),
-            paintButton
-        )
-    }
-
-    private fun Canvas.drawDefaultBackgroundColor() = paintButton.apply {
-        color = loadingDefaultBackgroundColor
-    }.run {
-        drawRect(
-            currentButtonBackgroundAnimationValue,
-            0f,
-            widthSize.toFloat(),
-            heightSize.toFloat(),
-            paintButton
-        )
-    }
-
+    // This is the function Udacity provided in the source code
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val minw: Int = paddingLeft + paddingRight + suggestedMinimumWidth
         val w: Int = resolveSizeAndState(minw, widthMeasureSpec, 1)
@@ -252,12 +176,7 @@ class LoadingButton @JvmOverloads constructor(
     }
 
     fun changeButtonState(state: ButtonState) {
-        if (state != buttonState) {
-            buttonState = state
-            invalidate()
-        }
+        buttonState = state
+        invalidate()
     }
-
 }
-
-
